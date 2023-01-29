@@ -1,7 +1,7 @@
 import image_dehazer										# Load the library
 import cv2
 
-HazeImg = cv2.imread('house_input.jpg')						# read input image -- (**must be a color image**)
+HazeImg = cv2.imread('./dataset/house_input.jpg')						# read input image -- (**must be a color image**)
 HazeCorrectedImg = image_dehazer.remove_haze(HazeImg)		# Remove Haze
 
 cv2.imshow('input image', HazeImg);						# display the original hazy image
