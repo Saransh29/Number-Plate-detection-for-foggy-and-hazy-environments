@@ -84,7 +84,7 @@ def recognise_license_plate(img_path):
             cv2.waitKey(0)
             break
 
-    cv2.imwrite('op_'+og_path+'.jpg', img)
+    cv2.imwrite('op.jpg', img)
 
 
 path = '../data/temp/mahindra.jpeg'
