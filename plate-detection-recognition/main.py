@@ -13,7 +13,7 @@ model_cfg_path = os.path.join('.', 'model', 'cfg', 'darknet-yolov3.cfg')
 model_weights_path = os.path.join('.', 'model', 'weights', 'model.weights')
 class_names_path = os.path.join('.', 'model', 'class.names')
 
-input_dir = './data'
+input_dir = './data/temp'
 
 for img_name in os.listdir(input_dir):
 
@@ -85,7 +85,7 @@ for img_name in os.listdir(input_dir):
                             (int(xc - (w / 2)), int(yc - (h / 2))),
                             (int(xc + (w / 2)), int(yc + (h / 2))),
                             (0, 255, 0),
-                            15)
+                            5)
 
         license_plate_gray = cv2.cvtColor(license_plate, cv2.COLOR_BGR2GRAY)
 
@@ -95,7 +95,7 @@ for img_name in os.listdir(input_dir):
 
         for out in output:
             text_bbox, text, text_score = out
-            print(text,text_score)
+            print(text,text_score*100)
             # if text_score > 0.4:
             #     print(text, text_score)
 
@@ -103,13 +103,28 @@ for img_name in os.listdir(input_dir):
     plt.figure()
     plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 
-    # plt.figure()
-    # plt.imshow(cv2.cvtColor(license_plate, cv2.COLOR_BGR2RGB))
+    plt.figure()
+    plt.imshow(cv2.cvtColor(license_plate, cv2.COLOR_BGR2RGB))
 
-    # plt.figure()
-    # plt.imshow(cv2.cvtColor(license_plate_gray, cv2.COLOR_BGR2RGB))
+    plt.figure()
+    plt.imshow(cv2.cvtColor(license_plate_gray, cv2.COLOR_BGR2RGB))
 
     plt.figure()
     plt.imshow(cv2.cvtColor(license_plate_thresh, cv2.COLOR_BGR2RGB))
 
-    # plt.show()
+    plt.show()
+
+    # cv2.imshow('img', img)
+    # cv2.waitKey(0)
+
+    # cv2.imshow('license_plate', license_plate)
+    # cv2.waitKey(0)
+
+    # cv2.imshow('license_plate_gray', license_plate_gray)
+    # cv2.waitKey(0)
+
+    # cv2.imshow('license_plate_thresh', license_plate_thresh)
+    # cv2.waitKey(0)
+
+    # cv2.destroyAllWindows()
+
