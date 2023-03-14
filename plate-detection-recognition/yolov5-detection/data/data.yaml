@@ -1,0 +1,13 @@
+train: ../yolov5-dataset/train/images
+val: ../yolov5-dataset/valid/images
+test: ../yolov5-dataset/test/images
+
+nc: 1
+names: ["license-plate"]
+
+roboflow:
+  workspace: project
+  project: vnpd
+  version: 1
+  license: MIT
+  url: https://universe.roboflow.com/project/vnpd/dataset/1
