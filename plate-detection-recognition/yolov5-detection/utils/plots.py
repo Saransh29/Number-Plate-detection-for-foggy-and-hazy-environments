@@ -9,6 +9,8 @@ import os
 from copy import copy
 from pathlib import Path
 from urllib.error import URLError
+import pytesseract
+import io
 
 import cv2
 import matplotlib
@@ -18,6 +20,13 @@ import pandas as pd
 import seaborn as sn
 import torch
 from PIL import Image, ImageDraw, ImageFont
+import re
+import easyocr
+
+
+##### DEFINING GLOBAL VARIABLE
+EASY_OCR = easyocr.Reader(['en']) ### initiating easyocr
+OCR_TH = 0.2
 
 from utils import TryExcept, threaded
 from utils.general import (CONFIG_DIR, FONT, LOGGER, check_font, check_requirements, clip_boxes, increment_path,
@@ -30,6 +39,8 @@ RANK = int(os.getenv('RANK', -1))
 matplotlib.rc('font', **{'size': 11})
 matplotlib.use('Agg')  # for writing to files only
 
+from google.cloud import vision_v1p3beta1 as vision
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'test.json'
 
 class Colors:
     # Ultralytics color palette https://ultralytics.com/
@@ -51,6 +62,7 @@ class Colors:
 
 colors = Colors()  # create instance for 'from utils.plots import colors'
 
+testing = "from global"
 
 def check_pil_font(font=FONT, size=10):
     # Return a PIL TrueType Font, downloading to CONFIG_DIR if necessary
@@ -107,10 +119,11 @@ class Annotator:
                 outside = p1[1] - h >= 3
                 p2 = p1[0] + w, p1[1] - h - 3 if outside else p1[1] + h + 3
                 cv2.rectangle(self.im, p1, p2, color, -1, cv2.LINE_AA)  # filled
+                
                 cv2.putText(self.im,
-                            label, (p1[0], p1[1] - 2 if outside else p1[1] + h + 2),
+                            testing, (p1[0], p1[1] - 2 if outside else p1[1] + h + 2),
                             0,
-                            self.lw / 3,
+                            self.lw / 6,
                             txt_color,
                             thickness=tf,
                             lineType=cv2.LINE_AA)
@@ -541,6 +554,41 @@ def profile_idetection(start=0, stop=0, labels=(), save_dir=''):
     ax[1].legend()
     plt.savefig(Path(save_dir) / 'idetection_profile.png', dpi=200)
 
+def recognize_plate_easyocr(img, coords,reader,region_threshold):
+    # separate coordinates from box
+    xmin, ymin, xmax, ymax = coords
+    # get the subimage that makes up the bounded region and take an additional 5 pixels on each side
+    # nplate = img[int(ymin)-5:int(ymax)+5, int(xmin)-5:int(xmax)+5]
+    nplate = img[int(ymin):int(ymax), int(xmin):int(xmax)] ### cropping the number plate from the whole image
+
+
+    ocr_result = reader.readtext(nplate)
+
+
+
+    text = filter_text(region=nplate, ocr_result=ocr_result, region_threshold= region_threshold)
+
+    if len(text) ==1:
+        text = text[0].upper()
+    return text
+
+
+### to filter out wrong detections 
+
+def filter_text(region, ocr_result, region_threshold):
+    rectangle_size = region.shape[0]*region.shape[1]
+    
+    plate = [] 
+    print(ocr_result)
+    for result in ocr_result:
+        length = np.sum(np.subtract(result[0][1], result[0][0]))
+        height = np.sum(np.subtract(result[0][2], result[0][1]))
+        
+        if length*height / rectangle_size > region_threshold:
+            plate.append(result[1])
+    return plate
+
+
 
 def save_one_box(xyxy, im, file=Path('im.jpg'), gain=1.02, pad=10, square=False, BGR=False, save=True):
     # Save image crop as {file} with crop size multiple {gain} and {pad} pixels. Save and/or return crop
@@ -552,6 +600,182 @@ def save_one_box(xyxy, im, file=Path('im.jpg'), gain=1.02, pad=10, square=False,
     xyxy = xywh2xyxy(b).long()
     clip_boxes(xyxy, im.shape)
     crop = im[int(xyxy[0, 1]):int(xyxy[0, 3]), int(xyxy[0, 0]):int(xyxy[0, 2]), ::(1 if BGR else -1)]
+
+    # show im
+    # cv2.imshow('im', crop)
+    # cv2.waitKey(0)
+    # tesseract config add
+
+    gray = cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY)
+
+
+
+    # resize image to three times as large as original for better readability
+    gray = cv2.resize(gray, None, fx = 3, fy = 3, interpolation = cv2.INTER_CUBIC)
+
+    # perform gaussian blur to smoothen image
+    blur = cv2.GaussianBlur(gray, (5,5), 0)
+    #cv2.imshow("Gray", gray)
+    #cv2.waitKey(0)
+    # threshold the image using Otsus method to preprocess for tesseract
+    ret, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY_INV)
+    #cv2.imshow("Otsu Threshold", thresh)
+    #cv2.waitKey(0)
+    # create rectangular kernel for dilation
+    rect_kern = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
+    # apply dilation to make regions more clear
+    dilation = cv2.dilate(thresh, rect_kern, iterations = 1)
+
+
+    # cv2.imshow("Dilation", dilation)
+    # cv2.waitKey(0)
+
+
+
+
+
+    
+
+    # gray = cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY)
+    # # threshold the image using Otsus method to preprocess for tesseract
+    # thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    # # perform a median blur to smooth image slightly
+    # blur = cv2.medianBlur(thresh, 3)
+    # # resize image to double the original size as tesseract does better with certain text size
+    # blur = cv2.resize(blur, None, fx = 4, fy = 2, interpolation = cv2.INTER_CUBIC)
+
+    # cv2.imshow('im', blur)
+    # cv2.waitKey(0)
+
+    # print("-------------------------------------")
+
+    plate = pytesseract.image_to_string(dilation,config='--psm 8 --oem 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ ')
+    # print confidence score of tesseract
+    # print("boxes ",pytesseract.image_to_boxes(dilation))
+
+    print("Tesseract :", plate) 
+
+    reader = easyocr.Reader(['en'])
+    output = reader.readtext(dilation)
+    for out in output:
+            text_bbox, text, text_score = out
+            print("Easy OCR:",text,text_score*100)
+
+    print("-------------------------------------")
+
+
+
+    # 2nd Method
+
+    client = vision.ImageAnnotatorClient()
+
+    cv2.imwrite("crop.jpg", crop)
+
+
+    gv_path = "crop.jpg"
+
+    with io.open(gv_path, 'rb') as image_file :
+        content = image_file.read()
+    
+    os.remove("crop.jpg")
+
+    
+    image = vision.types.Image(content=content)
+    response = client.object_localization(image=image)
+
+    response = client.text_detection(image=image)
+    texts = response.text_annotations
+    # print(texts)
+
+    for(text) in texts:
+        lplate_text = text.description
+        # print(text.description)
+        break
+    print(lplate_text) 
+
+    global testing 
+    testing = lplate_text
+
+    # 3rd Method
+    
+    # # grayscale region within bounding box
+    # gray = cv2.cvtColor(box, cv2.COLOR_RGB2GRAY)
+    # # resize image to three times as large as original for better readability
+    # gray = cv2.resize(gray, None, fx = 3, fy = 3, interpolation = cv2.INTER_CUBIC)
+    # # perform gaussian blur to smoothen image
+    # blur = cv2.GaussianBlur(gray, (5,5), 0)
+    # #cv2.imshow("Gray", gray)
+    # #cv2.waitKey(0)
+    # # threshold the image using Otsus method to preprocess for tesseract
+    # ret, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY_INV)
+    # #cv2.imshow("Otsu Threshold", thresh)
+    # #cv2.waitKey(0)
+
+    # create rectangular kernel for dilation
+    rect_kern = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
+    # apply dilation to make regions more clear
+
+    dilation = cv2.dilate(blur, rect_kern, iterations = 1)
+    #cv2.imshow("Dilation", dilation)
+    #cv2.waitKey(0)
+    # find contours of regions of interest within license plate
+    try:
+        contours, hierarchy = cv2.findContours(dilation, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    except:
+        ret_img, contours, hierarchy = cv2.findContours(dilation, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # sort contours left-to-right
+    sorted_contours = sorted(contours, key=lambda ctr: cv2.boundingRect(ctr)[0])
+    # create copy of gray image
+    im2 = gray.copy()
+    # create blank string to hold license plate number
+    plate_num = ""
+    # loop through contours and find individual letters and numbers in license plate
+    for cnt in sorted_contours:
+        x,y,w,h = cv2.boundingRect(cnt)
+        height, width = im2.shape
+        # if height of box is not tall enough relative to total height then skip
+        if height / float(h) > 6: continue
+
+        ratio = h / float(w)
+        # if height to width ratio is less than 1.5 skip
+        if ratio < 1.5: continue
+
+        # if width is not wide enough relative to total width then skip
+        if width / float(w) > 15: continue
+
+        area = h * w
+        # if area is less than 100 pixels skip
+        if area < 100: continue
+
+        # draw the rectangle
+        rect = cv2.rectangle(im2, (x,y), (x+w, y+h), (0,255,0),2)
+        # grab character region of image
+        roi = thresh[y-5:y+h+5, x-5:x+w+5]
+        # perfrom bitwise not to flip image to black text on white background
+        roi = cv2.bitwise_not(roi)
+        # perform another blur on character region
+        # roi = cv2.medianBlur(roi, 5)
+
+        # cv2.imshow("char" , roi)
+        # cv2.waitKey(0)
+        
+        try:
+            text = pytesseract.image_to_string(roi, config='-c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ --psm 8 --oem 3')
+            # clean tesseract text by removing any unwanted blank spaces
+            clean_text = re.sub('[\W_]+', '', text)
+            plate_num += clean_text
+        except: 
+            text = None
+
+    # if plate_num != None:
+    #     print("License Plate #: ", plate_num)
+
+    #cv2.imshow("Character's Segmented", im2)
+    #cv2.waitKey(0)
+    # return plate_num
+
+
+
     if save:
         file.parent.mkdir(parents=True, exist_ok=True)  # make directory
         f = str(increment_path(file).with_suffix('.jpg'))

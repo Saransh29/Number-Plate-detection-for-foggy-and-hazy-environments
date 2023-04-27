@@ -87,7 +87,7 @@ def recognise_license_plate(img_path):
     cv2.imwrite('op.jpg', img)
 
 
-path = '../data/temp/mahindra.jpeg'
+path = 'E:/btp-8/Number-Plate-detection-for-foggy-and-hazy-environments/dataset/video_images/car-wbs-MH12FU1014_00000.png'
 
 recognise_license_plate(path)
 
