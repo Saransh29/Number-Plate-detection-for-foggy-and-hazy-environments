@@ -649,11 +649,11 @@ def save_one_box(xyxy, im, file=Path('im.jpg'), gain=1.02, pad=10, square=False,
 
     # print("-------------------------------------")
 
-    plate = pytesseract.image_to_string(dilation,config='--psm 8 --oem 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ ')
-    # print confidence score of tesseract
-    # print("boxes ",pytesseract.image_to_boxes(dilation))
+    # plate = pytesseract.image_to_string(dilation,config='--psm 8 --oem 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ ')
+    # # print confidence score of tesseract
+    # # print("boxes ",pytesseract.image_to_boxes(dilation))
 
-    print("Tesseract :", plate) 
+    # print("Tesseract :", plate) 
 
     reader = easyocr.Reader(['en'])
     output = reader.readtext(dilation)
@@ -691,7 +691,7 @@ def save_one_box(xyxy, im, file=Path('im.jpg'), gain=1.02, pad=10, square=False,
         lplate_text = text.description
         # print(text.description)
         break
-    print(lplate_text) 
+    print("Tesseract :", lplate_text) 
 
     global testing 
     testing = lplate_text

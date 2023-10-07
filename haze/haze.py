@@ -2,16 +2,6 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-def addOverlay(natural_img):    
-    fog_img = cv2.imread(r'C:\Users\yugan\OneDrive\Desktop\Gog overlay textures\07_PS_overlay_mist.jpg')
-
-    # Resize the fog image to the same size as the natural image
-    fog_img = cv2.resize(fog_img, (natural_img.shape[1], natural_img.shape[0]))
-
-    # Adjust the opacity of the fog image
-    alpha = 0.5
-    fog_img = cv2.addWeighted(natural_img, alpha, fog_img, 1 - alpha, 0)
-    return fog_img
 
 def add_haze(img):
     # Convert the image to grayscale
@@ -75,7 +65,9 @@ def showImage(img1,img2,img3):
     axs[2].set_title(names[2])
     plt.show()
 # Load the natural image and the fog image
-natural_img = cv2.imread(r"../dataset/google_images/0a0d1748-48cd-4114-90cb-b5baf0b3cbe4___3e7fd381-0ae5-4421-8a70-279ee0ec1c61_147274518_15141875973_large.jpg")
+natural_img = cv2.imread(r"E:/btp-8/img-report/baleno_main.jpeg")
+# cv2.imshow("test",natural_img)
+# cv2.waitKey(0)
 
 # fog_img = addOverlay(natural_img)
 final_img = add_haze(natural_img)
@@ -92,6 +84,9 @@ ax[0].set_title('Image 1')
 # Display the second image in the second subplot
 ax[1].imshow(cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB))
 ax[1].set_title('Image 2')
+
+# save final_img
+cv2.imwrite('baleno_fog.jpg',final_img)
 
 ax[2].imshow(cv2.cvtColor(final_img2, cv2.COLOR_BGR2RGB))
 ax[2].set_title('Image 3')
